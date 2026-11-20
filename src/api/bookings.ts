@@ -7,9 +7,10 @@ export type Booking = {
   timezone: string;
 };
 
-const BASE = "https://fake.local";
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const BASE = API_URL ?? "https://fake.local";
 
-export const apiFetch: typeof fakeFetch = fakeFetch;
+export const apiFetch: typeof fetch = API_URL ? fetch : fakeFetch;
 
 const isNonEmpty = (v: unknown): v is string =>
   typeof v === "string" && v.trim() !== "";
