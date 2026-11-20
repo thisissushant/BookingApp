@@ -1,56 +1,97 @@
-# Welcome to your Expo app 👋
+# Booking App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo app with a bookings list and a booking detail screen. Bookings load from a fake REST API that ships inside the app, so no server is needed.
 
-## Get started
+## Stack
 
-1. Install dependencies
+- Expo SDK 58
+- Expo Router, React Native, TypeScript
+- @react-native-async-storage/async-storage for notes
+- expo-glass-effect for the glass cards
+- Jest with jest-expo for tests
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Install
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## Start
 
-### Other setup steps
+```bash
+npx expo start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Press `i` for the iOS simulator, `a` for the Android emulator, or `w` for web. Developed and tested on the iOS simulator.
 
-## Learn more
+## Test
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm test
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+The tests run without a device:
 
-## Join the community
+- `src/__tests__/check-in.test.ts` covers `canCheckIn` at 16 minutes before, 15 minutes before, and at start.
+- `src/__tests__/bookings.test.ts` covers `fetchBookings` skipping invalid rows and throwing on HTTP 500.
 
-Join our community of developers creating universal apps.
+## Fake API
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The app always uses the fake fetch in `src/api/fake-server.ts`, which returns a real `Response` object, so the parsing code in `src/api/bookings.ts` runs the same way it would against a server.
+
+The fake reads `EXPO_PUBLIC_BOOKINGS`:
+
+| Value                  | Result                                                         |
+| ---------------------- | -------------------------------------------------------------- |
+| unset or anything else | Default list, the row with missing fields is skipped           |
+| `empty`                | HTTP 200 with `[]`, list shows "No bookings"                   |
+| `error`                | HTTP 500, list shows "Could not load bookings" and "Try again" |
+
+```bash
+EXPO_PUBLIC_BOOKINGS=empty npx expo start
+EXPO_PUBLIC_BOOKINGS=error npx expo start
+```
+
+## Structure
+
+```
+src/
+  api/          fetchBookings and the fake server
+  app/          routes: / (list) and /bookings/[id] (detail)
+  components/   Screen (safe area), GlassCard, themed-text, themed-view
+  constants/    theme (from the Expo template)
+  hooks/        use-theme, use-color-scheme (from the Expo template)
+  lib/          canCheckIn, date and time formatting, note storage
+  __tests__/    automated tests
+```
+
+## Default Expo template files used
+
+These came with the Expo starter and were kept as they are:
+
+- `src/constants/theme.ts`
+- `src/hooks/use-theme.ts` and `use-color-scheme.ts` (with the `.web.ts` variant)
+- `src/components/themed-text.tsx` and `themed-view.tsx`
+- `src/global.css`
+- `app.json`, `tsconfig.json`
+
+The rest of the starter (tabs, explore screen, animated icon and related components) was removed.
+
+## Behaviour
+
+- Both screens keep their content inside the safe area.
+- The list supports search by title (case-insensitive), pull to refresh, and an Updated time that changes after a refresh.
+- The detail screen shows the title, date, local time and IANA timezone id.
+- Check in is disabled until `canCheckIn` returns true.
+- Notes are validated (empty and over 140 characters are rejected) and saved with AsyncStorage under the key `booking-note:<id>`. A saved note is still there when the booking is opened again.
+- The detail screen uses a keyboard-avoiding scroll container so the Note field and Save note stay visible.
+- Real liquid glass appears on iOS 26 and later. Other platforms use a translucent fallback.
+
+## Time taken
+
+About 2 hours.
+
+## AI tools
+
+- Tool: Claude.
+- Used for: project cleanup, boilerplate and repetitive work.
