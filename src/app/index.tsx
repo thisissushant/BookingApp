@@ -1,98 +1,139 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Button,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  TextInput,
+  useColorScheme,
+} from "react-native";
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { apiFetch, fetchBookings, type Booking } from "@/../src/api/bookings";
+import { formatTime } from "@/../src/lib/format";
+import { GlassCard } from "@/components/glass-card";
+import { Screen } from "@/components/screen";
+import { ThemedText } from "@/components/themed-text";
+import { Spacing } from "@/constants/theme";
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
+type Status = "loading" | "error" | "ready";
+
+export default function BookingsList() {
+  const router = useRouter();
+  const dark = useColorScheme() === "dark";
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [status, setStatus] = useState<Status>("loading");
+  const [refreshing, setRefreshing] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [query, setQuery] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setBookings(await fetchBookings(apiFetch));
+      setStatus("ready");
+      setUpdatedAt(new Date());
+    } catch {
+      setStatus("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q
+      ? bookings.filter((b) => b.title.toLowerCase().includes(q))
+      : bookings;
+  }, [bookings, query]);
+
+  if (status === "loading") {
     return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
+      <Screen>
+        <ActivityIndicator style={{ marginTop: 80 }} />
+      </Screen>
     );
   }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
 
-export default function HomeScreen() {
+  if (status === "error") {
+    return (
+      <Screen>
+        <GlassCard style={styles.center}>
+          <ThemedText>Could not load bookings</ThemedText>
+          <Button
+            title="Try again"
+            onPress={() => {
+              setStatus("loading");
+              load();
+            }}
+          />
+        </GlassCard>
+      </Screen>
+    );
+  }
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+    <Screen>
+      <ThemedText type="title">Bookings</ThemedText>
+      <GlassCard style={styles.searchCard}>
+        <TextInput
+          accessibilityLabel="Search bookings"
+          placeholder="Search bookings"
+          placeholderTextColor="#888"
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+          style={[styles.input, { color: dark ? "#fff" : "#000" }]}
+        />
+      </GlassCard>
+      <ThemedText type="small">
+        Updated {updatedAt ? updatedAt.toLocaleTimeString() : "-"}
+      </ThemedText>
+      <FlatList
+        data={filtered}
+        keyExtractor={(b) => b.id}
+        contentContainerStyle={{ gap: Spacing.two }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          <ThemedText>
+            {bookings.length === 0 ? "No bookings" : "No bookings match"}
           </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        }
+        renderItem={({ item }) => (
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/bookings/[id]",
+                params: { id: item.id },
+              })
+            }
+          >
+            <GlassCard>
+              <ThemedText type="subtitle">{item.title}</ThemedText>
+              <ThemedText type="small">
+                {formatTime(item.startsAt, item.timezone)} · {item.timezone}
+              </ThemedText>
+            </GlassCard>
+          </Pressable>
+        )}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  center: { alignItems: "center", gap: Spacing.two, marginTop: 80 },
+  searchCard: { paddingVertical: Spacing.one },
+  input: { fontSize: 16, paddingVertical: 10 },
 });
