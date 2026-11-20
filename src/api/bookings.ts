@@ -7,12 +7,9 @@ export type Booking = {
   timezone: string;
 };
 
-const BASE = process.env.EXPO_PUBLIC_API_URL ?? "https://fake.local";
+const BASE = "https://fake.local";
 
-// Real fetch when EXPO_PUBLIC_API_URL is set, otherwise the in-app fake.
-export const apiFetch: typeof fetch = process.env.EXPO_PUBLIC_API_URL
-  ? fetch
-  : fakeFetch;
+export const apiFetch: typeof fakeFetch = fakeFetch;
 
 const isNonEmpty = (v: unknown): v is string =>
   typeof v === "string" && v.trim() !== "";
