@@ -2,16 +2,18 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Button,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
   useColorScheme,
+  View,
 } from "react-native";
 
 import { apiFetch, fetchBookings, type Booking } from "@/api/bookings";
+import { AppButton } from "@/components/app-button";
 import { GlassCard } from "@/components/glass-card";
 import { Screen } from "@/components/screen";
 import { ThemedText } from "@/components/themed-text";
@@ -28,7 +30,8 @@ export default function BookingDetail() {
   const [booking, setBooking] = useState<Booking | null | undefined>(undefined);
   const [now, setNow] = useState(new Date());
   const [note, setNote] = useState("");
-  const [message, setMessage] = useState("");
+  const [noteMessage, setNoteMessage] = useState("");
+  const [checkedIn, setCheckedIn] = useState(false);
 
   useEffect(() => {
     fetchBookings(apiFetch)
@@ -37,21 +40,24 @@ export default function BookingDetail() {
     loadNote(id).then(setNote);
   }, [id]);
 
-  // re-evaluate check-in availability while the screen is open
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(t);
   }, []);
 
   const onSave = async () => {
-    if (note.trim() === "") return setMessage("Enter a note");
+    if (note.trim() === "") return setNoteMessage("Enter a note");
     if (note.length > 140)
-      return setMessage("Keep the note under 140 characters");
+      return setNoteMessage("Keep the note under 140 characters");
     await saveNote(id, note);
-    setMessage("Note saved");
+    setNoteMessage("Note saved");
   };
 
-  const back = <Button title="‹ Back" onPress={() => router.back()} />;
+  const back = (
+    <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
+      <ThemedText style={styles.backText}>‹ Bookings</ThemedText>
+    </Pressable>
+  );
 
   if (booking === undefined) {
     return (
@@ -69,6 +75,9 @@ export default function BookingDetail() {
     );
   }
 
+  const checkInEnabled = canCheckIn(now, new Date(booking.startsAt));
+  const saved = noteMessage === "Note saved";
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -77,31 +86,46 @@ export default function BookingDetail() {
       >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             gap: Spacing.three,
             paddingBottom: Spacing.four,
           }}
         >
           {back}
-          <GlassCard style={{ gap: Spacing.one }}>
-            <ThemedText type="title">{booking.title}</ThemedText>
-            <ThemedText>
-              {formatDate(booking.startsAt, booking.timezone)}
+
+          <GlassCard style={{ gap: Spacing.three }}>
+            <ThemedText type="title" style={{ fontSize: 28 }}>
+              {booking.title}
             </ThemedText>
-            <ThemedText>
-              {formatTime(booking.startsAt, booking.timezone)}
-            </ThemedText>
-            <ThemedText type="small">{booking.timezone}</ThemedText>
+            <Field
+              label="Date"
+              value={formatDate(booking.startsAt, booking.timezone)}
+            />
+            <Field
+              label="Local time"
+              value={formatTime(booking.startsAt, booking.timezone)}
+            />
+            <Field label="Timezone" value={booking.timezone} />
           </GlassCard>
 
-          <Button
-            title="Check in"
-            disabled={!canCheckIn(now, new Date(booking.startsAt))}
-            onPress={() => setMessage("Checked in")}
-          />
+          <View style={{ gap: Spacing.two }}>
+            <AppButton
+              title="Check in"
+              disabled={!checkInEnabled || checkedIn}
+              onPress={() => setCheckedIn(true)}
+            />
+            {checkedIn && (
+              <ThemedText type="small" style={styles.success}>
+                Checked in
+              </ThemedText>
+            )}
+          </View>
 
           <GlassCard style={{ gap: Spacing.two }}>
-            <ThemedText type="small">Note</ThemedText>
+            <ThemedText type="small" style={styles.label}>
+              Note
+            </ThemedText>
             <TextInput
               accessibilityLabel="Note"
               placeholder="Note"
@@ -109,13 +133,33 @@ export default function BookingDetail() {
               value={note}
               onChangeText={(t) => {
                 setNote(t);
-                setMessage("");
+                setNoteMessage("");
               }}
               multiline
-              style={[styles.input, { color: dark ? "#fff" : "#000" }]}
+              style={[
+                styles.input,
+                {
+                  color: dark ? "#fff" : "#000",
+                  borderColor: dark
+                    ? "rgba(255,255,255,0.18)"
+                    : "rgba(15,23,42,0.12)",
+                },
+              ]}
             />
-            <Button title="Save note" onPress={onSave} />
-            {message !== "" && <ThemedText type="small">{message}</ThemedText>}
+            <View style={styles.counterRow}>
+              <ThemedText
+                type="small"
+                style={
+                  noteMessage !== "" && !saved ? styles.error : styles.success
+                }
+              >
+                {noteMessage}
+              </ThemedText>
+              <ThemedText type="small" style={styles.label}>
+                {note.length}/140
+              </ThemedText>
+            </View>
+            <AppButton title="Save note" onPress={onSave} />
           </GlassCard>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -123,6 +167,32 @@ export default function BookingDetail() {
   );
 }
 
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ gap: 2 }}>
+      <ThemedText type="small" style={styles.label}>
+        {label}
+      </ThemedText>
+      <ThemedText style={{ fontSize: 17, fontWeight: "500" }}>
+        {value}
+      </ThemedText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  input: { minHeight: 64, fontSize: 16, textAlignVertical: "top" },
+  back: { alignSelf: "flex-start", paddingTop: Spacing.two },
+  backText: { color: "#2F5BEA", fontSize: 17, fontWeight: "600" },
+  label: { opacity: 0.6 },
+  input: {
+    minHeight: 88,
+    fontSize: 16,
+    textAlignVertical: "top",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
+  counterRow: { flexDirection: "row", justifyContent: "space-between" },
+  success: { color: "#16A34A" },
+  error: { color: "#DC2626" },
 });

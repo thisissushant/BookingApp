@@ -30,7 +30,6 @@ export const fakeFetch: typeof fetch = async (input, init) => {
   const url = String(input);
   const method = (init?.method ?? "GET").toUpperCase();
 
-  // small delay so loading / refresh states are visible
   await new Promise((r) => setTimeout(r, 400));
 
   if (method !== "GET" || !url.endsWith("/bookings")) {

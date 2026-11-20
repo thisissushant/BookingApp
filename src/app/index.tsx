@@ -2,21 +2,22 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Button,
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
   TextInput,
   useColorScheme,
+  View,
 } from "react-native";
 
-import { apiFetch, fetchBookings, type Booking } from "@/../src/api/bookings";
-import { formatTime } from "@/../src/lib/format";
+import { apiFetch, fetchBookings, type Booking } from "@/api/bookings";
+import { AppButton } from "@/components/app-button";
 import { GlassCard } from "@/components/glass-card";
 import { Screen } from "@/components/screen";
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
+import { formatTime } from "@/lib/format";
 
 type Status = "loading" | "error" | "ready";
 
@@ -69,7 +70,7 @@ export default function BookingsList() {
       <Screen>
         <GlassCard style={styles.center}>
           <ThemedText>Could not load bookings</ThemedText>
-          <Button
+          <AppButton
             title="Try again"
             onPress={() => {
               setStatus("loading");
@@ -83,7 +84,13 @@ export default function BookingsList() {
 
   return (
     <Screen>
-      <ThemedText type="title">Bookings</ThemedText>
+      <View style={styles.header}>
+        <ThemedText type="title">Bookings</ThemedText>
+        <ThemedText type="small" style={styles.muted}>
+          Updated {updatedAt ? updatedAt.toLocaleTimeString() : "-"}
+        </ThemedText>
+      </View>
+
       <GlassCard style={styles.searchCard}>
         <TextInput
           accessibilityLabel="Search bookings"
@@ -95,9 +102,7 @@ export default function BookingsList() {
           style={[styles.input, { color: dark ? "#fff" : "#000" }]}
         />
       </GlassCard>
-      <ThemedText type="small">
-        Updated {updatedAt ? updatedAt.toLocaleTimeString() : "-"}
-      </ThemedText>
+
       <FlatList
         data={filtered}
         keyExtractor={(b) => b.id}
@@ -119,10 +124,15 @@ export default function BookingsList() {
               })
             }
           >
-            <GlassCard>
-              <ThemedText type="subtitle">{item.title}</ThemedText>
-              <ThemedText type="small">
-                {formatTime(item.startsAt, item.timezone)} · {item.timezone}
+            <GlassCard style={styles.row}>
+              <View style={styles.rowText}>
+                <ThemedText style={styles.rowTitle}>{item.title}</ThemedText>
+                <ThemedText type="small" style={styles.muted}>
+                  {item.timezone}
+                </ThemedText>
+              </View>
+              <ThemedText style={styles.time}>
+                {formatTime(item.startsAt, item.timezone)}
               </ThemedText>
             </GlassCard>
           </Pressable>
@@ -134,6 +144,16 @@ export default function BookingsList() {
 
 const styles = StyleSheet.create({
   center: { alignItems: "center", gap: Spacing.two, marginTop: 80 },
+  header: { gap: 2, paddingTop: Spacing.two },
+  muted: { opacity: 0.6 },
   searchCard: { paddingVertical: Spacing.one },
   input: { fontSize: 16, paddingVertical: 10 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  rowText: { flex: 1, gap: 2 },
+  rowTitle: { fontSize: 17, fontWeight: "600" },
+  time: { fontSize: 15, fontWeight: "600", color: "#2F5BEA" },
 });
